@@ -1,33 +1,28 @@
-#include <Arduino.h>
+#include <esp32-hal-gpio.h>
 
-#define LED_RED_OUTPUT 14
-#define LED_BLUE_OUTPUT 2
-#define LED_GREEN_OUTPUT 42
+#define LED_OUTPUT 5
+#define DELAY_SLOW 750
+#define DELAY_FAST 250
 
-void step_blink_pin(uint8_t pin);
+void blink(uint32_t timeoutMs, int iterations);
 
 void setup() {
-  pinMode(LED_RED_OUTPUT , OUTPUT);
-  pinMode(LED_BLUE_OUTPUT , OUTPUT);
-  pinMode(LED_GREEN_OUTPUT , OUTPUT);
+  pinMode(LED_OUTPUT, OUTPUT);
 }
 
 void loop() {
-  step_blink_pin(LED_RED_OUTPUT);
-  step_blink_pin(LED_BLUE_OUTPUT);
-  step_blink_pin(LED_GREEN_OUTPUT);
+
+  blink(DELAY_SLOW, 5);
+  blink(DELAY_FAST, 10);
+
 }
 
-
-void step_blink_pin(uint8_t pin) {
-  for (int i = 0; i < 256; i++) {
-    delay(15);
-    analogWrite(pin, i);
-  }
-
-  for (int i = 0; i < 256; i++) {
-    delay(15);
-    int result = 255 - i;
-    analogWrite(pin, result);
+void blink(uint32_t timeoutMs, int iterations) {
+    for (int i = 0; i < iterations; i++) {
+    digitalWrite(LED_OUTPUT, HIGH);
+    delay(timeoutMs);
+    digitalWrite(LED_OUTPUT, LOW);
+    delay(timeoutMs);
   }
 }
+
