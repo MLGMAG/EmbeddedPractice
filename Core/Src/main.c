@@ -42,14 +42,34 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
+TIM_HandleTypeDef htim2;
+
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static volatile int is_button_pressed = 0;
+
+typedef enum {
+	STATE_IDLE,
+	STATE_PRESSED,
+	STATE_HELD,
+	STATE_RELEASE,
+} BUTTON_STATE_TYPE;
+
+static volatile const uint32_t button_polling_timeout = 10;
+static volatile const uint32_t button_press_timeout = 2000;
+static volatile const uint8_t button_state_recording_max = 5;
+
+static volatile BUTTON_STATE_TYPE button_state = STATE_IDLE;
+static volatile uint32_t last_button_polling = 0;
+static volatile uint32_t button_held_time_ms = 0;
+static volatile uint32_t button_release_time_ms = 0;
 static volatile int button_pressed_count = 0;
 
-static uint8_t data[100];
-static uint16_t len;
+static volatile uint8_t button_state_recording_counter = 0;
+static volatile uint8_t button_state_recording[5];
+
+static volatile uint8_t data[100];
+static volatile uint16_t len;
 
 /* USER CODE END PV */
 
@@ -57,6 +77,7 @@ static uint16_t len;
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
+static void MX_TIM2_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -96,7 +117,10 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   MX_USART1_UART_Init();
+  MX_TIM2_Init();
   /* USER CODE BEGIN 2 */
+
+  HAL_TIM_Base_Start(&htim2);
 
   sprintf((char *) data, "MCU is initialized\n");
   len = strlen((char *) data);
@@ -112,14 +136,58 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  if (is_button_pressed == 1)
+	  uint32_t counter_value = __HAL_TIM_GET_COUNTER(&htim2);
+	  if (counter_value - last_button_polling >= button_polling_timeout)
 	  {
-		  button_pressed_count++;
-		  is_button_pressed = 0;
+		  GPIO_PinState button_pin_value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3);
+		  if (button_pin_value == GPIO_PIN_RESET && button_state == STATE_IDLE) {
+			  button_state = STATE_PRESSED;
+		  }
 
-		  sprintf((char *) data, "Button is pressed! General count: %d\n", button_pressed_count);
-		  len = strlen((char *) data);
-		  HAL_UART_Transmit(&huart1, data, len, 100);
+		  if (button_state == STATE_PRESSED && button_state_recording_counter < button_state_recording_max) {
+			  button_state_recording[button_state_recording_counter] = button_pin_value;
+			  button_state_recording_counter++;
+		  }
+
+		  if (button_state == STATE_PRESSED && button_state_recording_counter == button_state_recording_max) {
+			  for (int i = 0; i < button_state_recording_max; i++) {
+				  if (button_state_recording[i] == GPIO_PIN_SET) {
+					  button_state = STATE_IDLE;
+					  button_state_recording_counter = 0;
+					  break;
+				  }
+
+				  if (i == button_state_recording_max - 1) {
+					  button_state = STATE_HELD;
+					  button_state_recording_counter = 0;
+					  button_held_time_ms = counter_value;
+				  }
+			  }
+		  }
+
+		  if (button_state == STATE_HELD && button_pin_value == GPIO_PIN_SET) {
+			  button_pressed_count++;
+
+			  uint32_t press_time = counter_value - button_held_time_ms;
+			  if (press_time >= button_press_timeout) {
+				  sprintf((char *) data, "Button LONG press! Time: %d ms. Press count: %d\n", press_time, button_pressed_count);
+				  len = strlen((char *) data);
+				  HAL_UART_Transmit(&huart1, data, len, 100);
+			  } else {
+				  sprintf((char *) data, "Button SHORT press! Time: %d ms. Press count: %d\n", press_time, button_pressed_count);
+				  len = strlen((char *) data);
+				  HAL_UART_Transmit(&huart1, data, len, 100);
+			  }
+
+			  button_release_time_ms = counter_value;
+			  button_state = STATE_RELEASE;
+		  }
+
+		  if (button_state == STATE_RELEASE && counter_value - button_release_time_ms >= button_polling_timeout) {
+			  button_state = STATE_IDLE;
+		  }
+
+		  last_button_polling = counter_value;
 	  }
   }
   /* USER CODE END 3 */
@@ -169,6 +237,51 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
+}
+
+/**
+  * @brief TIM2 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM2_Init(void)
+{
+
+  /* USER CODE BEGIN TIM2_Init 0 */
+
+  /* USER CODE END TIM2_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+
+  /* USER CODE BEGIN TIM2_Init 1 */
+
+  /* USER CODE END TIM2_Init 1 */
+  htim2.Instance = TIM2;
+  htim2.Init.Prescaler = 36000 - 1;
+  htim2.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim2.Init.Period = 4294967295;
+  htim2.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim2.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;
+  if (HAL_TIM_Base_Init(&htim2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim2, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim2, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM2_Init 2 */
+
+  /* USER CODE END TIM2_Init 2 */
+
 }
 
 /**
@@ -224,13 +337,9 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin : PC3 */
   GPIO_InitStruct.Pin = GPIO_PIN_3;
-  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
   GPIO_InitStruct.Pull = GPIO_PULLUP;
   HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
-
-  /* EXTI interrupt init*/
-  HAL_NVIC_SetPriority(EXTI3_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(EXTI3_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -238,14 +347,6 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
-
-void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
-{
-    if(GPIO_Pin == GPIO_PIN_3)
-    {
-    	is_button_pressed = 1;
-    }
-}
 
 /* USER CODE END 4 */
 
