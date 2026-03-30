@@ -111,9 +111,8 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  GPIO_PinState pin_value = HAL_GPIO_ReadPin(GPIOC, GPIO_PIN_3);
 
-	  if (is_button_pressed == 1 && pin_value == GPIO_PIN_RESET)
+	  if (is_button_pressed == 1)
 	  {
 		  button_pressed_count++;
 		  is_button_pressed = 0;
