@@ -44,7 +44,7 @@
 
 /* USER CODE BEGIN PV */
 
-static volatile last_button_value = 0;
+static volatile GPIO_PinState last_button_value = 0;
 
 /* USER CODE END PV */
 
@@ -90,7 +90,7 @@ int main(void)
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
   /* USER CODE BEGIN 2 */
-
+  setup();
   /* USER CODE END 2 */
 
   /* Infinite loop */
@@ -100,14 +100,7 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  GPIO_PinState button_value = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1);
-
-	  if (last_button_value == GPIO_PIN_RESET && button_value == GPIO_PIN_SET)
-	  {
-		  HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_2);
-	  }
-
-	  last_button_value = button_value;
+	  loop();
   }
   /* USER CODE END 3 */
 }
@@ -190,6 +183,20 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void setup() {
+
+}
+
+void loop() {
+	GPIO_PinState button_value = HAL_GPIO_ReadPin(GPIOA, GPIO_PIN_1);
+
+	if (last_button_value == GPIO_PIN_RESET && button_value == GPIO_PIN_SET)
+	{
+		HAL_GPIO_TogglePin(GPIOA, GPIO_PIN_2);
+	}
+
+	last_button_value = button_value;
+}
 
 /* USER CODE END 4 */
 
