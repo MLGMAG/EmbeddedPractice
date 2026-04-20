@@ -27,12 +27,27 @@
 
 /* Private typedef -----------------------------------------------------------*/
 /* USER CODE BEGIN PTD */
+typedef enum {
+	STATE_IDLE,
+	STATE_PRESSED,
+	STATE_HELD,
+	STATE_RELEASE
+} BUTTON_STATE_T;
+
+typedef struct {
+	GPIO_PinState last_value;
+	BUTTON_STATE_T state;
+	GPIO_PinState button_state_recording[5];
+	uint8_t recording_counter;
+} button_info_t;
 
 /* USER CODE END PTD */
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BUTTON_STATE_RECORDING_LEN 5
+#define SERVO_MAX_ANGLE 180
+#define SERVO_MIN_ANGLE 0
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -41,38 +56,57 @@
 /* USER CODE END PM */
 
 /* Private variables ---------------------------------------------------------*/
-ADC_HandleTypeDef hadc1;
-DMA_HandleTypeDef hdma_adc1;
-
 TIM_HandleTypeDef htim1;
 TIM_HandleTypeDef htim2;
 
 UART_HandleTypeDef huart2;
 
 /* USER CODE BEGIN PV */
-static volatile uint8_t pwm_flag = 0;
-static volatile uint8_t dma_flag = 0;
-static volatile uint8_t tim2_flag = 0;
+static volatile uint8_t servo_pwm_flag = 0;
+static volatile uint8_t buzzer_pwm_flag = 0;
+static volatile uint8_t uart_flag = 0;
+static volatile uint8_t encoder_flag = 0;
 
-static volatile uint16_t adc_data[1];
-
-static volatile float servo_angle = 0;
-
-static volatile uint16_t servo_period = 2000;
-static volatile uint16_t servo_counter = 0;
+static float servo_angle = 0;
+static uint16_t servo_period = 2000;
+static uint16_t servo_counter = 0;
 
 static uint8_t uart_data[100];
 static uint16_t uart_data_len;
 static uint16_t uart_delay_counter = 0;
+
+static button_info_t encoder_a_contact = {
+		.last_value = GPIO_PIN_SET,
+		.state = STATE_IDLE,
+		.button_state_recording = {GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET},
+		.recording_counter = 0
+};
+static button_info_t encoder_b_contact = {
+		.last_value = GPIO_PIN_SET,
+		.state = STATE_IDLE,
+		.button_state_recording = {GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET},
+		.recording_counter = 0
+};
+static button_info_t encoder_click_contact = {
+		.last_value = GPIO_PIN_SET,
+		.state = STATE_IDLE,
+		.button_state_recording = {GPIO_PIN_SET, GPIO_PIN_SET, GPIO_PIN_SET},
+		.recording_counter = 0
+};
+static uint8_t encoder_multiplier = 1;
+
+static uint8_t enable_buzzer = 0;
+static uint16_t buzzer_period = 681;
+static uint16_t buzzer_duty = 340;
+static uint16_t buzzer_delay_iter = 0;
+static uint16_t buzzer_counter = 0;
 
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
 void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
-static void MX_DMA_Init(void);
 static void MX_TIM1_Init(void);
-static void MX_ADC1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_USART2_UART_Init(void);
 /* USER CODE BEGIN PFP */
@@ -85,52 +119,150 @@ static void MX_USART2_UART_Init(void);
 float convert_duty_to_angle(uint8_t duty) {
 	if (duty > 250)
 	{
-		return 180;
+		return SERVO_MAX_ANGLE;
 	}
 
 	if (duty < 50)
 	{
-		return 0;
+		return SERVO_MIN_ANGLE;
 	}
 
-	return ((float) (duty - 50)) / 200 * 180;
+	return ((float) (duty - 50)) / 200 * SERVO_MAX_ANGLE;
 }
 
 uint8_t convert_angle_to_duty(float angle) {
-	if (angle > 180)
+	if (angle > SERVO_MAX_ANGLE)
 	{
 		return 250;
 	}
 
-	if (angle < 0)
+	if (angle < SERVO_MIN_ANGLE)
 	{
 		return 50;
 	}
 
-	return (uint8_t) (angle / 180 * 200 + 50);
+	return (uint8_t) (angle / SERVO_MAX_ANGLE * 200 + 50);
 }
 
-void DMA_ServoAngle_Read() {
-	if (dma_flag == 1)
+void button_info_update(GPIO_PinState current_value, button_info_t *button_info) {
+	  if (button_info->state == STATE_IDLE &&
+			  current_value == GPIO_PIN_RESET &&
+			  button_info->last_value == GPIO_PIN_SET)
+	  {
+		  button_info->state = STATE_PRESSED;
+	  }
+
+	  if (button_info->state == STATE_PRESSED &&
+			  button_info->recording_counter < BUTTON_STATE_RECORDING_LEN)
+	  {
+		  button_info->button_state_recording[button_info->recording_counter] = current_value;
+		  button_info->recording_counter++;
+	  }
+
+	  if (button_info->state == STATE_PRESSED &&
+			  button_info->recording_counter == BUTTON_STATE_RECORDING_LEN)
+	  {
+		  for (int i = 0; i < button_info->recording_counter; i++)
+		  {
+			  if (button_info->button_state_recording[i] == GPIO_PIN_SET)
+			  {
+				  button_info->state = STATE_IDLE;
+				  break;
+			  }
+		  }
+
+		  if (button_info->state == STATE_PRESSED)
+		  {
+			  button_info->state = STATE_HELD;
+		  }
+
+		  button_info->recording_counter = 0;
+	  }
+
+	  if (button_info->state == STATE_HELD && current_value == GPIO_PIN_SET)
+	  {
+		  button_info->state = STATE_RELEASE;
+	  }
+
+	  if (button_info->state == STATE_RELEASE && button_info->recording_counter < 2)
+	  {
+		  button_info->recording_counter++;
+	  }
+
+	  if (button_info->state == STATE_RELEASE && button_info->recording_counter == 2)
+	  {
+		  button_info->recording_counter = 0;
+		  button_info->state = STATE_IDLE;
+	  }
+
+	  button_info->last_value = current_value;
+}
+
+void ENC_Buttons_Read() {
+	if (encoder_flag == 1) {
+		button_info_update(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_0), &encoder_a_contact);
+		button_info_update(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_1), &encoder_b_contact);
+		button_info_update(HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_2), &encoder_click_contact);
+
+		if (encoder_click_contact.state == STATE_RELEASE) {
+			encoder_multiplier = encoder_multiplier == 1 ? 5 : 1;
+		}
+
+		int8_t encoder_diff = 0;
+		if (encoder_a_contact.state == STATE_RELEASE && encoder_b_contact.state == STATE_HELD) {
+			encoder_diff += 1 * encoder_multiplier;
+		}
+
+		if (encoder_b_contact.state == STATE_RELEASE && encoder_a_contact.state == STATE_HELD) {
+			encoder_diff += -1 * encoder_multiplier;
+		}
+
+		if (servo_angle + encoder_diff > SERVO_MAX_ANGLE ||
+				servo_angle + encoder_diff < SERVO_MIN_ANGLE)
+		{
+			enable_buzzer = 1;
+		}
+		else
+		{
+			servo_angle += encoder_diff;
+		}
+
+		encoder_flag = 0;
+	  }
+}
+
+void BUZZER_Update() {
+	if (buzzer_pwm_flag == 1 && enable_buzzer == 1)
 	{
-		float angle = ((float) adc_data[0]) / 4095 * 180;
-		if (angle > 179)
+
+		if (buzzer_counter == buzzer_period)
 		{
-			angle = 180;
+			buzzer_counter = 0;
+			buzzer_delay_iter++;
+			if (buzzer_delay_iter == 20)
+			{
+				buzzer_delay_iter = 0;
+				enable_buzzer = 0;
+			}
 		}
 
-		if (angle < 1)
+		if (buzzer_counter <= buzzer_duty)
 		{
-			angle = 0;
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_SET);
 		}
-		servo_angle = angle;
 
-		dma_flag = 0;
+		if (buzzer_counter > buzzer_duty)
+		{
+			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_1, GPIO_PIN_RESET);
+		}
+
+		buzzer_counter++;
+		buzzer_pwm_flag = 0;
 	}
 }
 
-void SERVO_Angle_Update() {
-	if (pwm_flag == 1)
+void SERVO_Angle_Set() {
+	if (servo_pwm_flag == 1)
 	{
 		servo_counter++;
 
@@ -150,12 +282,12 @@ void SERVO_Angle_Update() {
 			HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
 		}
 
-		pwm_flag = 0;
+		servo_pwm_flag = 0;
 	}
 }
 
 void UART_ServoAngle_Log() {
-	if (tim2_flag == 1) {
+	if (uart_flag == 1) {
 		uart_delay_counter++;
 
 		if (uart_delay_counter == 1000) {
@@ -166,7 +298,7 @@ void UART_ServoAngle_Log() {
 			HAL_UART_Transmit(&huart2, uart_data, uart_data_len, 100);
 		}
 
-		tim2_flag = 0;
+		uart_flag = 0;
 	}
 }
 
@@ -201,16 +333,13 @@ int main(void)
 
   /* Initialize all configured peripherals */
   MX_GPIO_Init();
-  MX_DMA_Init();
   MX_TIM1_Init();
-  MX_ADC1_Init();
   MX_TIM2_Init();
   MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
 
   HAL_TIM_Base_Start_IT(&htim1);
   HAL_TIM_Base_Start_IT(&htim2);
-  HAL_ADC_Start_DMA(&hadc1, (uint32_t *) &adc_data, 1);
 
   /* USER CODE END 2 */
 
@@ -221,8 +350,11 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  DMA_ServoAngle_Read();
-	  SERVO_Angle_Update();
+	  ENC_Buttons_Read();
+
+
+
+	  SERVO_Angle_Set();
 	  UART_ServoAngle_Log();
   }
   /* USER CODE END 3 */
@@ -272,58 +404,6 @@ void SystemClock_Config(void)
   {
     Error_Handler();
   }
-}
-
-/**
-  * @brief ADC1 Initialization Function
-  * @param None
-  * @retval None
-  */
-static void MX_ADC1_Init(void)
-{
-
-  /* USER CODE BEGIN ADC1_Init 0 */
-
-  /* USER CODE END ADC1_Init 0 */
-
-  ADC_ChannelConfTypeDef sConfig = {0};
-
-  /* USER CODE BEGIN ADC1_Init 1 */
-
-  /* USER CODE END ADC1_Init 1 */
-
-  /** Configure the global features of the ADC (Clock, Resolution, Data Alignment and number of conversion)
-  */
-  hadc1.Instance = ADC1;
-  hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-  hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = DISABLE;
-  hadc1.Init.ContinuousConvMode = DISABLE;
-  hadc1.Init.DiscontinuousConvMode = DISABLE;
-  hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_RISING;
-  hadc1.Init.ExternalTrigConv = ADC_EXTERNALTRIGCONV_T2_TRGO;
-  hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 1;
-  hadc1.Init.DMAContinuousRequests = ENABLE;
-  hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-  if (HAL_ADC_Init(&hadc1) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_1;
-  sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-  /* USER CODE BEGIN ADC1_Init 2 */
-
-  /* USER CODE END ADC1_Init 2 */
-
 }
 
 /**
@@ -451,22 +531,6 @@ static void MX_USART2_UART_Init(void)
 }
 
 /**
-  * Enable DMA controller clock
-  */
-static void MX_DMA_Init(void)
-{
-
-  /* DMA controller clock enable */
-  __HAL_RCC_DMA2_CLK_ENABLE();
-
-  /* DMA interrupt init */
-  /* DMA2_Stream0_IRQn interrupt configuration */
-  HAL_NVIC_SetPriority(DMA2_Stream0_IRQn, 0, 0);
-  HAL_NVIC_EnableIRQ(DMA2_Stream0_IRQn);
-
-}
-
-/**
   * @brief GPIO Initialization Function
   * @param None
   * @retval None
@@ -480,16 +544,23 @@ static void MX_GPIO_Init(void)
 
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
+  __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, GPIO_PIN_0|GPIO_PIN_1, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : PA0 */
-  GPIO_InitStruct.Pin = GPIO_PIN_0;
+  /*Configure GPIO pins : PA0 PA1 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : PB0 PB1 PB2 */
+  GPIO_InitStruct.Pin = GPIO_PIN_0|GPIO_PIN_1|GPIO_PIN_2;
+  GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -501,21 +572,14 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
 {
 	if (htim->Instance == TIM1)
 	{
-		pwm_flag = 1;
+		servo_pwm_flag = 1;
+		buzzer_pwm_flag = 1;
 	}
 
 	if (htim->Instance == TIM2)
 	{
-		tim2_flag = 1;
-	}
-}
-
-void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-
-	if (hadc->Instance == ADC1)
-	{
-		dma_flag = 1;
+		uart_flag = 1;
+		encoder_flag = 1;
 	}
 }
 
