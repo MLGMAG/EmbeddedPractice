@@ -24,9 +24,6 @@
 #include <stdio.h>
 #include <string.h>
 #include "BME280.h"
-#include "ssd1306.h"
-#include "ssd1306_fonts.h"
-
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -36,7 +33,7 @@
 
 /* Private define ------------------------------------------------------------*/
 /* USER CODE BEGIN PD */
-
+#define BUFFER_SIZE 32
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -47,19 +44,31 @@
 /* Private variables ---------------------------------------------------------*/
 I2C_HandleTypeDef hi2c1;
 
+SPI_HandleTypeDef hspi1;
+
 TIM_HandleTypeDef htim1;
 
 UART_HandleTypeDef huart1;
 DMA_HandleTypeDef hdma_usart1_tx;
 
 /* USER CODE BEGIN PV */
+static const uint8_t READ_WEATHER_DATA_COMMAND = 0x01;
+static const uint8_t READ_WEATHER_DATA_RX_SIZE = sizeof(char);
+static const uint8_t READ_WEATHER_DATA_TX_SIZE  = 3 * sizeof(float);
 
 static volatile uint8_t tx_available = 1;
 static volatile uint8_t tim1_interrupt = 0;
+static volatile uint8_t spi_cs_interrupt = 0;
+static volatile uint8_t spi_tx_request = 0;
+
+static volatile uint8_t spi_tx_completed = 0;
+static volatile uint8_t spi_rx_completed = 0;
 
 BME280_Data_t BME280;
 
 static uint8_t message_buffer[100];
+static volatile uint8_t spi_rx_buffer[BUFFER_SIZE] = {0};
+static volatile uint8_t spi_tx_buffer[BUFFER_SIZE] = {0};
 
 /* USER CODE END PV */
 
@@ -70,11 +79,12 @@ static void MX_DMA_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
 static void MX_TIM1_Init(void);
+static void MX_SPI1_Init(void);
 /* USER CODE BEGIN PFP */
 static void BME280_Init(void);
 static HAL_StatusTypeDef UART_MessageTransmit(const uint8_t*);
-static void SSD1306_UpdateScreen(BME280_Data_t*);
 static HAL_StatusTypeDef UART_DebugLogTransit(BME280_Data_t*);
+static void SPI_HandleSpi();
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
@@ -116,45 +126,42 @@ static HAL_StatusTypeDef UART_MessageTransmit(const uint8_t *message) {
 	return result;
 }
 
-static void SSD1306_UpdateScreen(BME280_Data_t* sensor_data) {
-	  ssd1306_SetCursor(5, 5);
-	  ssd1306_WriteString("Maga loves Kate!", Font_6x8, White);
+static HAL_StatusTypeDef UART_DebugLogTransit(BME280_Data_t* sensor_data) {
+	sprintf(
+		  (char *) message_buffer,
+		  "T: %.1f°C  RH: %d%%  P: %d hPa\n",
+		  sensor_data->Temperature, ((int) sensor_data->Humidity), ((int) sensor_data->Pressure)
+	);
 
-	  sprintf(
-			  (char *) message_buffer,
-			  "T: %.1f°C",
-			  sensor_data->Temperature
-	  );
-	  ssd1306_SetCursor(5, 20);
-	  ssd1306_WriteString(message_buffer, Font_6x8, White);
-
-	  sprintf(
-			  (char *) message_buffer,
-			  "RH: %d%%",
-			  ((int) sensor_data->Humidity)
-	  );
-	  ssd1306_SetCursor(5, 35);
-	  ssd1306_WriteString(message_buffer, Font_6x8, White);
-
-	  sprintf(
-			  (char *) message_buffer,
-			  "P: %d hPa",
-			  ((int) sensor_data->Pressure)
-	  );
-	  ssd1306_SetCursor(5, 50);
-	  ssd1306_WriteString(message_buffer, Font_6x8, White);
-
-	  ssd1306_UpdateScreen();
+	return UART_MessageTransmit(message_buffer);
 }
 
-static HAL_StatusTypeDef UART_DebugLogTransit(BME280_Data_t* sensor_data) {
-	  sprintf(
-			  (char *) message_buffer,
-			  "T: %.1f°C  RH: %d%%  P: %d hPa\n",
-			  sensor_data->Temperature, ((int) sensor_data->Humidity), ((int) sensor_data->Pressure)
-	  );
+static void SPI_HandleSpi() {
+	if (spi_cs_interrupt == 1)
+	{
+		spi_cs_interrupt = 0;
+		HAL_SPI_Receive_IT(&hspi1, spi_rx_buffer, 1);
+	}
 
-	  return UART_MessageTransmit(message_buffer);
+	if (spi_rx_completed == 1)
+	{
+		spi_rx_completed = 0;
+
+		if (memcmp(spi_rx_buffer, &READ_WEATHER_DATA_COMMAND, READ_WEATHER_DATA_RX_SIZE) == 0)
+		{
+			memcpy(spi_tx_buffer, &BME280, READ_WEATHER_DATA_TX_SIZE);
+			HAL_SPI_Transmit_IT(&hspi1, spi_tx_buffer, READ_WEATHER_DATA_TX_SIZE);
+		} else {
+			spi_tx_completed = 1;
+		}
+	}
+
+	if (spi_tx_completed == 1)
+	{
+		spi_tx_completed = 0;
+
+		HAL_NVIC_EnableIRQ(EXTI4_IRQn);
+	}
 }
 
 /* USER CODE END 0 */
@@ -192,14 +199,14 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   MX_TIM1_Init();
+  MX_SPI1_Init();
   /* USER CODE BEGIN 2 */
 
   UART_MessageTransmit("MCU_INIT\n");
+
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
   HAL_TIM_Base_Start_IT(&htim1);
-
   BME280_Init();
-
-  ssd1306_Init();
 
   /* USER CODE END 2 */
 
@@ -210,15 +217,17 @@ int main(void)
     /* USER CODE END WHILE */
 
     /* USER CODE BEGIN 3 */
-	  if (tim1_interrupt == 1) {
+	  if (tim1_interrupt == 1)
+	  {
 		  BME280Calculation(&BME280);
-		  SSD1306_UpdateScreen(&BME280);
 		  UART_DebugLogTransit(&BME280);
 
 		  HAL_TIM_Base_Start_IT(&htim1);
 
 		  tim1_interrupt = 0;
 	  }
+
+	  SPI_HandleSpi();
   }
   /* USER CODE END 3 */
 }
@@ -243,7 +252,12 @@ void SystemClock_Config(void)
   RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSI;
   RCC_OscInitStruct.HSIState = RCC_HSI_ON;
   RCC_OscInitStruct.HSICalibrationValue = RCC_HSICALIBRATION_DEFAULT;
-  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_NONE;
+  RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+  RCC_OscInitStruct.PLL.PLLSource = RCC_PLLSOURCE_HSI;
+  RCC_OscInitStruct.PLL.PLLM = 8;
+  RCC_OscInitStruct.PLL.PLLN = 100;
+  RCC_OscInitStruct.PLL.PLLP = RCC_PLLP_DIV2;
+  RCC_OscInitStruct.PLL.PLLQ = 4;
   if (HAL_RCC_OscConfig(&RCC_OscInitStruct) != HAL_OK)
   {
     Error_Handler();
@@ -253,12 +267,12 @@ void SystemClock_Config(void)
   */
   RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
                               |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2;
-  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_HSI;
+  RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
   RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+  RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV2;
   RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
 
-  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_0) != HAL_OK)
+  if (HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_3) != HAL_OK)
   {
     Error_Handler();
   }
@@ -295,6 +309,43 @@ static void MX_I2C1_Init(void)
   /* USER CODE BEGIN I2C1_Init 2 */
 
   /* USER CODE END I2C1_Init 2 */
+
+}
+
+/**
+  * @brief SPI1 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_SPI1_Init(void)
+{
+
+  /* USER CODE BEGIN SPI1_Init 0 */
+
+  /* USER CODE END SPI1_Init 0 */
+
+  /* USER CODE BEGIN SPI1_Init 1 */
+
+  /* USER CODE END SPI1_Init 1 */
+  /* SPI1 parameter configuration*/
+  hspi1.Instance = SPI1;
+  hspi1.Init.Mode = SPI_MODE_SLAVE;
+  hspi1.Init.Direction = SPI_DIRECTION_2LINES;
+  hspi1.Init.DataSize = SPI_DATASIZE_8BIT;
+  hspi1.Init.CLKPolarity = SPI_POLARITY_LOW;
+  hspi1.Init.CLKPhase = SPI_PHASE_1EDGE;
+  hspi1.Init.NSS = SPI_NSS_SOFT;
+  hspi1.Init.FirstBit = SPI_FIRSTBIT_MSB;
+  hspi1.Init.TIMode = SPI_TIMODE_DISABLE;
+  hspi1.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
+  hspi1.Init.CRCPolynomial = 10;
+  if (HAL_SPI_Init(&hspi1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN SPI1_Init 2 */
+
+  /* USER CODE END SPI1_Init 2 */
 
 }
 
@@ -400,6 +451,7 @@ static void MX_DMA_Init(void)
   */
 static void MX_GPIO_Init(void)
 {
+  GPIO_InitTypeDef GPIO_InitStruct = {0};
   /* USER CODE BEGIN MX_GPIO_Init_1 */
 
   /* USER CODE END MX_GPIO_Init_1 */
@@ -407,6 +459,16 @@ static void MX_GPIO_Init(void)
   /* GPIO Ports Clock Enable */
   __HAL_RCC_GPIOA_CLK_ENABLE();
   __HAL_RCC_GPIOB_CLK_ENABLE();
+
+  /*Configure GPIO pin : PA4 */
+  GPIO_InitStruct.Pin = GPIO_PIN_4;
+  GPIO_InitStruct.Mode = GPIO_MODE_IT_FALLING;
+  GPIO_InitStruct.Pull = GPIO_PULLUP;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+  /* EXTI interrupt init*/
+  HAL_NVIC_SetPriority(EXTI4_IRQn, 0, 0);
+  HAL_NVIC_EnableIRQ(EXTI4_IRQn);
 
   /* USER CODE BEGIN MX_GPIO_Init_2 */
 
@@ -424,10 +486,33 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart) {
 void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim) {
 	if (htim == &htim1)
 	{
-		tim1_interrupt = 1;
 		HAL_TIM_Base_Stop_IT(&htim1);
+		tim1_interrupt = 1;
 	}
 }
+
+void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if (hspi == &hspi1)
+	{
+		spi_rx_completed = 1;
+	}
+}
+
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) {
+	if (hspi == &hspi1)
+	{
+		spi_tx_completed = 1;
+	}
+}
+
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin) {
+	if (GPIO_Pin == GPIO_PIN_4)
+	{
+		HAL_NVIC_DisableIRQ(EXTI4_IRQn);
+		spi_cs_interrupt = 1;
+	}
+}
+
 /* USER CODE END 4 */
 
 /**
