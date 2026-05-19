@@ -24,7 +24,7 @@ static LOGGER_Error_t LOGGER_write(const char* message, const char* prefix) {
 	sprintf((char *) LOGGER_buffer, "%s%s\n", prefix, message);
 	uint16_t log_message_len = strlen((char *) LOGGER_buffer);
 
-	HAL_StatusTypeDef status = HAL_UART_Transmit(LOGGER_UART_PORT, LOGGER_buffer, log_message_len, HAL_MAX_DELAY);
+	HAL_StatusTypeDef status = HAL_UART_Transmit(&LOGGER_UART_PORT, LOGGER_buffer, log_message_len, HAL_MAX_DELAY);
 	if (status != HAL_OK) {
 		return LOGGER_ERR;
 	}

@@ -14,7 +14,7 @@
 #if defined(LOGGER_USE_SWD)
 #elif defined(LOGGER_USE_UART)
 extern UART_HandleTypeDef LOGGER_UART_PORT;
-#elif defined(LOGGER_UART_PORT)
+#elif defined(LOGGER_SPI_PORT)
 extern SPI_HandleTypeDef LOGGER_SPI_PORT;
 #else
 #error "You should define SSD1306_USE_SPI or SSD1306_USE_I2C macro!"
