@@ -24,6 +24,8 @@
 /* USER CODE BEGIN Includes */
 #include <stdio.h>
 #include <string.h>
+#include <stdint.h>
+#include <fatfs_logger.h>
 /* USER CODE END Includes */
 
 /* Private typedef -----------------------------------------------------------*/
@@ -48,8 +50,7 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static FATFS FatFs;
-static BYTE buffer[64];
+static char buffer[64];
 
 /* USER CODE END PV */
 
@@ -59,58 +60,23 @@ static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
-static void mountDrive(FATFS *fs);
-static void initLogDir();
-static UINT writeToLogFile(char *message);
+static void FATFS_LOGGER_Init(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
-static void mountDrive(FATFS *fs) {
-	FRESULT fres;
-	fres = f_mount(fs, "", 1);
+static void FATFS_LOGGER_Init(void) {
+	UAL_FATFS_LOGGER_InitStruct_t init_params;
 
-	if (fres != FR_OK) {
-		while (1)
-			;
+	FATFS fatfs = {};
+	memcpy(&(init_params.fatfs), &fatfs, sizeof(FATFS));
+
+	memcpy(&(init_params.log_dir_title), LOG_DIR_TITLE, sizeof(LOG_DIR_TITLE));
+	memcpy(&(init_params.log_file_path), LOG_FILE_PATH, sizeof(LOG_FILE_PATH));
+
+	if (UAL_FATFS_LOGGER_Init(&init_params) != UAL_FATFS_LOGGER_STATUS_OK) {
+		Error_Handler();
 	}
-}
-
-static void initLogDir() {
-	FRESULT fres;
-	FILINFO fno;
-
-	fres = f_stat(LOG_DIR_TITLE, &fno);
-	if (fres == FR_NO_FILE) {
-		fres = f_mkdir(LOG_DIR_TITLE);
-	}
-
-	if (fres != FR_OK) {
-		while (1)
-			;
-	}
-}
-
-static UINT writeToLogFile(char *message) {
-	FRESULT fres;
-	FIL fil;
-	fres = f_open(&fil, LOG_FILE_PATH, FA_WRITE | FA_OPEN_APPEND);
-	if (fres != FR_OK) {
-		while (1)
-			;
-	}
-
-	UINT bytesWrote;
-	uint16_t len = strlen((char*) message);
-	fres = f_write(&fil, message, len, &bytesWrote);
-	if (fres != FR_OK) {
-		while (1)
-			;
-	}
-
-	f_close(&fil);
-
-	return bytesWrote;
 }
 /* USER CODE END 0 */
 
@@ -148,10 +114,13 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 	HAL_Delay(1000);
 
-	mountDrive(&FatFs);
-	initLogDir();
-	writeToLogFile("MCU is initialized\n");
+	FATFS_LOGGER_Init();
 
+	if (UAL_FATFS_LOGGER_Write("MCU is initialized\n") != UAL_FATFS_LOGGER_STATUS_OK) {
+		Error_Handler();
+	}
+
+	UAL_FATFS_LOGGER_Status_t write_status;
 	int counter = 0;
 
 	/* USER CODE END 2 */
@@ -164,7 +133,10 @@ int main(void) {
 		/* USER CODE BEGIN 3 */
 		counter++;
 		sprintf((char*) buffer, "Iteration: %d\n", counter);
-		writeToLogFile((char*) buffer);
+		write_status = UAL_FATFS_LOGGER_Write((char*) buffer);
+		if (write_status != UAL_FATFS_LOGGER_STATUS_OK) {
+			Error_Handler();
+		}
 
 		HAL_Delay(1000);
 	}
