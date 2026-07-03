@@ -37,6 +37,7 @@
 /* USER CODE BEGIN PD */
 #define LOG_DIR_TITLE "stm32_logs"
 #define LOG_FILE_PATH "stm32_logs/logs.txt"
+#define LOG_MESSAGE_BUFFER_LEN 64
 /* USER CODE END PD */
 
 /* Private macro -------------------------------------------------------------*/
@@ -50,7 +51,7 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static char buffer[64];
+static char buffer[LOG_MESSAGE_BUFFER_LEN];
 
 /* USER CODE END PV */
 
@@ -68,13 +69,22 @@ static void FATFS_LOGGER_Init(void);
 static void FATFS_LOGGER_Init(void) {
 	UAL_FATFS_LOGGER_InitStruct_t init_params;
 
-	FATFS fatfs = {};
+	FATFS fatfs = { };
 	memcpy(&(init_params.fatfs), &fatfs, sizeof(FATFS));
 
 	memcpy(&(init_params.log_dir_title), LOG_DIR_TITLE, sizeof(LOG_DIR_TITLE));
 	memcpy(&(init_params.log_file_path), LOG_FILE_PATH, sizeof(LOG_FILE_PATH));
 
-	if (UAL_FATFS_LOGGER_Init(&init_params) != UAL_FATFS_LOGGER_STATUS_OK) {
+	if (UAL_FATFS_LOGGER_Init(&init_params) != UAL_FATFS_STATUS_OK) {
+		Error_Handler();
+	}
+}
+
+static void LOGGER_WriteIteration(uint32_t *itreation) {
+	UAL_FATFS_Status_t write_status;
+	sprintf((char*) buffer, "Iteration: %lu\n", *itreation);
+	write_status = UAL_FATFS_LOGGER_Write((char*) buffer);
+	if (write_status != UAL_FATFS_STATUS_OK) {
 		Error_Handler();
 	}
 }
@@ -116,12 +126,11 @@ int main(void) {
 
 	FATFS_LOGGER_Init();
 
-	if (UAL_FATFS_LOGGER_Write("MCU is initialized\n") != UAL_FATFS_LOGGER_STATUS_OK) {
+	if (UAL_FATFS_LOGGER_Write("MCU is initialized\n") != UAL_FATFS_STATUS_OK) {
 		Error_Handler();
 	}
 
-	UAL_FATFS_LOGGER_Status_t write_status;
-	int counter = 0;
+	uint32_t counter = 0;
 
 	/* USER CODE END 2 */
 
@@ -132,11 +141,7 @@ int main(void) {
 
 		/* USER CODE BEGIN 3 */
 		counter++;
-		sprintf((char*) buffer, "Iteration: %d\n", counter);
-		write_status = UAL_FATFS_LOGGER_Write((char*) buffer);
-		if (write_status != UAL_FATFS_LOGGER_STATUS_OK) {
-			Error_Handler();
-		}
+		LOGGER_WriteIteration(&counter);
 
 		HAL_Delay(1000);
 	}
