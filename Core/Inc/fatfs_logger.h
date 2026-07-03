@@ -6,7 +6,6 @@
 #include "fatfs_utility.h"
 
 typedef struct {
-	FATFS fatfs;
 	char log_dir_title[32];
 	char log_file_path[64];
 } UAL_FATFS_LOGGER_InitStruct_t;

@@ -51,7 +51,8 @@ SPI_HandleTypeDef hspi2;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-static char buffer[LOG_MESSAGE_BUFFER_LEN];
+FATFS fatfs = { };
+static char buffer[LOG_MESSAGE_BUFFER_LEN] = { 0 };
 
 /* USER CODE END PV */
 
@@ -61,17 +62,22 @@ static void MX_GPIO_Init(void);
 static void MX_SPI2_Init(void);
 static void MX_USART1_UART_Init(void);
 /* USER CODE BEGIN PFP */
+static void FATFS_Init(void);
 static void FATFS_LOGGER_Init(void);
+static void LOGGER_WriteIteration(uint32_t *itreation);
+static void FATFS_Read(void);
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+static void FATFS_Init(void) {
+	if (UAL_FATFS_UTILITY_MountDrive(&fatfs) != UAL_FATFS_STATUS_OK) {
+		Error_Handler();
+	}
+}
+
 static void FATFS_LOGGER_Init(void) {
 	UAL_FATFS_LOGGER_InitStruct_t init_params;
-
-	FATFS fatfs = { };
-	memcpy(&(init_params.fatfs), &fatfs, sizeof(FATFS));
-
 	memcpy(&(init_params.log_dir_title), LOG_DIR_TITLE, sizeof(LOG_DIR_TITLE));
 	memcpy(&(init_params.log_file_path), LOG_FILE_PATH, sizeof(LOG_FILE_PATH));
 
@@ -85,6 +91,14 @@ static void LOGGER_WriteIteration(uint32_t *itreation) {
 	sprintf((char*) buffer, "Iteration: %lu\n", *itreation);
 	write_status = UAL_FATFS_LOGGER_Write((char*) buffer);
 	if (write_status != UAL_FATFS_STATUS_OK) {
+		Error_Handler();
+	}
+}
+
+static void FATFS_Read(void) {
+	uint8_t buffer[60] = {0};
+	UAL_FATFS_ReadResult_t result = UAL_FATFS_UTILITY_Read(LOG_FILE_PATH, buffer, 0, 32);
+	if (result.status != UAL_FATFS_STATUS_OK) {
 		Error_Handler();
 	}
 }
@@ -124,6 +138,7 @@ int main(void) {
 	/* USER CODE BEGIN 2 */
 	HAL_Delay(1000);
 
+	FATFS_Init();
 	FATFS_LOGGER_Init();
 
 	if (UAL_FATFS_LOGGER_Write("MCU is initialized\n") != UAL_FATFS_STATUS_OK) {
@@ -142,6 +157,7 @@ int main(void) {
 		/* USER CODE BEGIN 3 */
 		counter++;
 		LOGGER_WriteIteration(&counter);
+		FATFS_Read();
 
 		HAL_Delay(1000);
 	}
