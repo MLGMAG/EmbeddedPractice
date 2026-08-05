@@ -1,6 +1,9 @@
 #include <bme280.h>
 #include "stdio.h"
 #include "math.h"
+#include "stm32f4xx_hal.h"
+
+extern I2C_HandleTypeDef bme280_i2c;
 
 /*
  * Compensation words definition
@@ -17,16 +20,16 @@ int32_t t_fine;
  *
  * @retval None
  */
-void Reset_BME280(void) {
+void BME280_Reset(void) {
 
 	uint8_t data = 0xB6;
-	HAL_I2C_Mem_Write(&bme_i2c, BME280_ADDR, RESET_REG_ADDR, 1, &data, 1,
+	HAL_I2C_Mem_Write(&bme280_i2c, BME280_ADDR, RESET_REG_ADDR, 1, &data, 1,
 			HAL_MAX_DELAY);
 	HAL_Delay(500);
 
 	//Checking for is reset process done
 	uint8_t id;
-	HAL_I2C_Mem_Read(&bme_i2c, BME280_ADDR, CHIP_ID_REG_ADDR, 1, &id, 1,
+	HAL_I2C_Mem_Read(&bme280_i2c, BME280_ADDR, CHIP_ID_REG_ADDR, 1, &id, 1,
 			HAL_MAX_DELAY);
 
 	//If value of id register is not equal to BME280 chip id which is 0x60, wait until equal to each other
@@ -43,12 +46,25 @@ void Reset_BME280(void) {
  *
  * @retval None
  */
-HAL_StatusTypeDef BME280_SleepMode(void) {
+BME280_STATUS_t BME280_SleepMode(void) {
 	uint8_t init = 0;
 	init = BME280_SLEEP_MODE;
 
-	return HAL_I2C_Mem_Write(&bme_i2c, BME280_ADDR, CTRL_MEAS_REG_ADDR, 1,
-			&init, 1, 1000);
+	HAL_StatusTypeDef status = HAL_I2C_Mem_Write(
+		&bme280_i2c,
+		BME280_ADDR,
+		CTRL_MEAS_REG_ADDR,
+		1,
+		&init,
+		1,
+		1000
+	);
+
+	if (status != HAL_OK) {
+		return BME280_STATUS_ERROR;
+	}
+
+	return BME280_STATUS_OK;
 
 }
 
@@ -59,13 +75,13 @@ HAL_StatusTypeDef BME280_SleepMode(void) {
  *
  * @retval None
  */
-void Calibdata_BME280(void) {
+void BME280_Calibdata(void) {
 	uint8_t CalibrationData1[26];
 	uint8_t CalibrationData2[7];
 
-	HAL_I2C_Mem_Read(&bme_i2c, BME280_ADDR, CALIB_DATA00_25_BASEADDR, 1,
+	HAL_I2C_Mem_Read(&bme280_i2c, BME280_ADDR, CALIB_DATA00_25_BASEADDR, 1,
 			CalibrationData1, 26, HAL_MAX_DELAY); //From 0x88 to 0xA1
-	HAL_I2C_Mem_Read(&bme_i2c, BME280_ADDR, CALIB_DATA26_41_BASEADDR, 1,
+	HAL_I2C_Mem_Read(&bme280_i2c, BME280_ADDR, CALIB_DATA26_41_BASEADDR, 1,
 			CalibrationData2, 7, HAL_MAX_DELAY); //From 0xE1 to 0xE7
 
 	dig_T1 = (CalibrationData1[1] << 8) | CalibrationData1[0];
@@ -96,12 +112,12 @@ void Calibdata_BME280(void) {
  *
  * @retval None
  */
-Raw_Data_t RawdataBME280(void) {
+BME280_Raw_Data_t BME280_GetRawData(void) {
 
 	uint8_t rawData[8];
-	Raw_Data_t data;
+	BME280_Raw_Data_t data;
 
-	HAL_I2C_Mem_Read(&bme_i2c, BME280_ADDR, RAWDATA_BASEADDR, 1, rawData, 8,
+	HAL_I2C_Mem_Read(&bme280_i2c, BME280_ADDR, RAWDATA_BASEADDR, 1, rawData, 8,
 			1000);
 
 	//Separation of raw data buffer for temperature, humidity and pressure
@@ -119,7 +135,7 @@ Raw_Data_t RawdataBME280(void) {
  *
  * @retval Processed temperature data
  */
-int32_t BME280_measure_Temp(int32_t adc_T) {
+int32_t BME280_MeasureTemp(int32_t adc_T) {
 	int32_t var1, var2, T;
 
 	var1 = ((((adc_T >> 3) - ((int32_t) dig_T1 << 1))) * ((int32_t) dig_T2))
@@ -139,7 +155,7 @@ int32_t BME280_measure_Temp(int32_t adc_T) {
  *
  * @retval Processed pressure data
  */
-uint32_t BME280_measure_Press(int32_t adc_P) {
+uint32_t BME280_MeasurePress(int32_t adc_P) {
 	int64_t var1, var2, p;
 
 	var1 = ((int64_t) t_fine) - 128000;
@@ -167,7 +183,7 @@ uint32_t BME280_measure_Press(int32_t adc_P) {
  *
  * @retval Processed humidity data
  */
-uint32_t BME280_measure_Hum(int32_t adc_H) {
+uint32_t BME280_MeasureHum(int32_t adc_H) {
 	int32_t v_x1_u32r;
 
 	v_x1_u32r = (t_fine - ((int32_t) 76800));
@@ -200,14 +216,14 @@ uint32_t BME280_measure_Hum(int32_t adc_H) {
  *
  * @retval BME280 sensor datas in structure data type
  */
-void BME280Calculation(BME280_Data_t *result) {
-	Raw_Data_t rawData = RawdataBME280();
+void BME280_Calculation(BME280_Data_t *result) {
+	BME280_Raw_Data_t rawData = BME280_GetRawData();
 
-	Calibdata_BME280();
+	BME280_Calibdata();
 
-	result->Temperature = (BME280_measure_Temp(rawData.tempr)) / 100.0;	//Degress
-	result->Pressure = (BME280_measure_Press(rawData.pressr)) / 25600.0;//hPa
-	result->Humidity = (BME280_measure_Hum(rawData.humr)) / 1024.0;		//%RH
+	result->Temperature = (BME280_MeasureTemp(rawData.tempr)) / 100.0;	//Degress
+	result->Pressure = (BME280_MeasurePress(rawData.pressr)) / 25600.0;//hPa
+	result->Humidity = (BME280_MeasureHum(rawData.humr)) / 1024.0;		//%RH
 
 	result->AltitudeP = 44330
 			* (1 - pow(result->Pressure / 1013.25, 1 / 5.255)); /*Calculation of altitude parameter in meters with
@@ -227,19 +243,19 @@ void BME280Calculation(BME280_Data_t *result) {
  *
  * @retval None
  */
-void BME280Init(BME280_Init_t BME280Init) {
+void BME280_Init(BME280_Init_t BME280Init) {
 
 	uint8_t init = 0;
 
 	//Setting it to sleep mode because the config register can only be changed while the BME280 is in sleep mode
-	if (BME280_SleepMode() == HAL_OK) {
+	if (BME280_SleepMode() == BME280_STATUS_OK) {
 
 		printf(
 				"BME280 was put into sleep mode so that the config register could be set.!\n");
 		//Configuration of config register which is control standby time, filter and SPI 3-wire interface
 		init = ((BME280Init.T_StandBy << 5) | (BME280Init.Filter << 2)
 				| (BME280Init.SPI_EnOrDıs << 0));
-		HAL_I2C_Mem_Write(&bme_i2c, BME280_ADDR, CONFIG_REG_ADDR, 1, &init, 1,
+		HAL_I2C_Mem_Write(&bme280_i2c, BME280_ADDR, CONFIG_REG_ADDR, 1, &init, 1,
 				1000);
 		HAL_Delay(100);
 		init = 0;
@@ -247,7 +263,7 @@ void BME280Init(BME280_Init_t BME280Init) {
 
 	//Configuration of ctrl_hum register which is control oversamplig of Humidity
 	init = ((BME280Init.OverSampling_H << 0) & 0x7);
-	HAL_I2C_Mem_Write(&bme_i2c, BME280_ADDR, CTRL_HUM_REG_ADDR, 1, &init, 1,
+	HAL_I2C_Mem_Write(&bme280_i2c, BME280_ADDR, CTRL_HUM_REG_ADDR, 1, &init, 1,
 			1000);
 	HAL_Delay(100);
 	init = 0;
@@ -255,7 +271,7 @@ void BME280Init(BME280_Init_t BME280Init) {
 	//Configuration of ctrl_meas register which is control oversamplig of Temperature-Pressure and device mode
 	init = (BME280Init.OverSampling_T << 5) | (BME280Init.OverSampling_P << 2)
 			| BME280Init.Mode;
-	HAL_I2C_Mem_Write(&bme_i2c, BME280_ADDR, CTRL_MEAS_REG_ADDR, 1, &init, 1,
+	HAL_I2C_Mem_Write(&bme280_i2c, BME280_ADDR, CTRL_MEAS_REG_ADDR, 1, &init, 1,
 			1000);
 	HAL_Delay(100);
 	init = 0;

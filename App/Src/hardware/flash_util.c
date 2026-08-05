@@ -1,13 +1,13 @@
-#include "flash.h"
+#include "hardware/flash_util.h"
 #include "stm32f4xx_hal.h"
-#include <string.h>
+#include "string.h"
 
-uint8_t FLASH_Read(uint32_t *data, uint16_t size) {
-	memcpy((void*) data, (void*) FLASH_USER_START_ADDR, size * FLASH_DATA_SIZE);
+uint8_t UAL_FLASH_UTIL_Read(uint32_t *data, uint16_t size) {
+	memcpy((void*) data, (void*) UAL_FLASH_UTIL_USER_START_ADDR, size * UAL_FLASH_UTIL_DATA_SIZE);
 	return 1;
 }
 
-uint8_t FLASH_Write(uint32_t *data, uint16_t size, void (*error_handler)(void)) {
+uint8_t UAL_FLASH_UTIL_Write(uint32_t *data, uint16_t size, void (*error_handler)(void)) {
 	HAL_StatusTypeDef status;
 	HAL_FLASH_Unlock();
 
@@ -23,14 +23,14 @@ uint8_t FLASH_Write(uint32_t *data, uint16_t size, void (*error_handler)(void)) 
 		error_handler();
 		return 0;
 	}
-	uint32_t address = FLASH_USER_START_ADDR;
+	uint32_t address = UAL_FLASH_UTIL_USER_START_ADDR;
 
 	for (uint16_t i = 0; i < size; i++) {
 		for (int j = 0; j < 5; j++) {
 			status = HAL_FLASH_Program(FLASH_TYPEPROGRAM_WORD, address,
 					data[i]);
 			if (status == HAL_OK) {
-				address += FLASH_DATA_SIZE;
+				address += UAL_FLASH_UTIL_DATA_SIZE;
 				break;
 			}
 			if (j == 4) {

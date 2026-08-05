@@ -1,0 +1,13 @@
+#ifndef __SENSORS_DATA_STORAGE_H
+#define __SENSORS_DATA_STORAGE_H
+
+#include "common.h"
+
+#define UAL_SENSORS_DATA_STORAGE_MAX_SIZE 32
+
+void UAL_SENSORS_DATA_STORAGE_Collect(const SENSORS_DATA_t *data);
+void UAL_SENSORS_DATA_STORAGE_PeristToFlash();
+void UAL_SENSORS_DATA_STORAGE_Enable();
+void UAL_SENSORS_DATA_STORAGE_Disable();
+
+#endif /* __SENSORS_DATA_STORAGE_H */

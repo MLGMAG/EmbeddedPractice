@@ -1,10 +1,9 @@
-#ifndef INC_BME280_H_
-#define INC_BME280_H_
+#ifndef __BME280_H
+#define __BME280_H
 
-#include "stm32f4xx_hal.h"
+#include "stdint.h"
 
-extern I2C_HandleTypeDef hi2c1;
-#define bme_i2c (hi2c1)
+#define bme280_i2c (hi2c1)
 
 #define BME280_ADDR 				(0x76 << 1) 		/*!I2C Address of BME280, which is 0xEC*/
 #define CHIP_ID_BME 				0x60				/*!Chip ID of BME280*/
@@ -93,7 +92,7 @@ typedef struct {
 	int32_t tempr;
 	int32_t pressr;
 	int32_t humr;
-} Raw_Data_t;
+} BME280_Raw_Data_t;
 
 typedef struct {
 	float Temperature;
@@ -116,18 +115,22 @@ typedef struct {
 	uint8_t SPI_EnOrDıs;
 } BME280_Init_t;
 
+typedef enum {
+	BME280_STATUS_OK, BME280_STATUS_ERROR,
+} BME280_STATUS_t;
+
 /*
  * BME280 library function declaration
  */
-void Calibdata_BME280(void);
-Raw_Data_t RawdataBME280(void);
-void BME280Init(BME280_Init_t BME280Init);
-void BME280Calculation(BME280_Data_t *result);
-HAL_StatusTypeDef BME280_SleepMode(void);
-uint32_t BME280_measure_Hum(int32_t adc_H);
-uint32_t BME280_measure_Press(int32_t adc_P);
-int32_t BME280_measure_Temp(int32_t adc_T);
+void BME280_Calibdata(void);
+BME280_Raw_Data_t BME280_GetRawData(void);
+void BME280_Init(BME280_Init_t BME280Init);
+void BME280_Calculation(BME280_Data_t *result);
+BME280_STATUS_t BME280_SleepMode(void);
+uint32_t BME280_MeasureHum(int32_t adc_H);
+uint32_t BME280_MeasurePress(int32_t adc_P);
+int32_t BME280_MeasureTemp(int32_t adc_T);
 
-void Reset_BME280(void);
+void BME280_Reset(void);
 
-#endif /* INC_BME280_H_ */
+#endif /* __BME280_H */
