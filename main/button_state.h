@@ -1,0 +1,16 @@
+#ifndef __BUTTON_STATE_H
+#define __BUTTON_STATE_H
+
+#include "stdint.h"
+
+typedef enum {
+	UAL_BUTTON_STATE_IDLE,
+	UAL_BUTTON_STATE_PRESSED,
+	UAL_BUTTON_STATE_HELD,
+	UAL_BUTTON_STATE_RELEASE
+} UAL_BUTTON_STATE_t;
+
+UAL_BUTTON_STATE_t UAL_BUTTON_STATE_GetState();
+void UAL_BUTTON_STATE_UpdateState(uint8_t value);
+
+#endif /* __BUTTON_STATE_H */
