@@ -1,18 +1,16 @@
-#include "driver/gpio.h"
-#include "esp_err.h"
-#include "esp_log.h"
-#include "freertos/idf_additions.h"
-#include "freertos/projdefs.h"
-#include "sdkconfig.h"
+#include "button_task.h"
 #include "button_state.h"
-#include "common.h"
+#include "driver/gpio.h"
+#include "esp_log.h"
+#include"common.h"
+#include "freertos/idf_additions.h"
 #include "gpio_util.h"
+
+static const char *TAG = "BUTTON_TASK";
 
 QueueHandle_t BUTTON_IT_QUEUE;
 
-static const char *TAG = "APP";
-
-static void init() {
+void init() {
 	gpio_config_t config;
 	esp_err_t status;
 
@@ -39,18 +37,18 @@ static void init() {
 		ESP_LOGE(TAG, "Failed to config GPIO %d, status: %d", CONFIG_INPUT_GPIO, status);
 		UAL_Error_Handler();
 	}
-	
+
 	gpio_install_isr_service(0);
-	
+
 	BUTTON_IT_QUEUE = xQueueCreate(4, sizeof(uint8_t));
 }
 
-void app_main(void) {
+void UAL_BUTTON_TASK_Start(void *pvParameters) {
 	init();
 	
 	GPIO_PinState led_state = GPIO_PIN_RESET;
-
-	while (1) {
+	
+	while(1) {
 		UAL_BUTTON_STATE_t button_state = UAL_BUTTON_STATE_GetState();
 		if (button_state == UAL_BUTTON_STATE_IDLE) {
 			UAL_GPIO_UTIL_EnableButtonIt();

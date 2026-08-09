@@ -1,3 +1,0 @@
-CompileFlags:
-  CompilationDatabase: /home/mlgmag/workspace/esp32s3/build
-  Remove: [-m*, -f*]
