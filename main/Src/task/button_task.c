@@ -2,9 +2,9 @@
 #include "button_state.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
-#include"common.h"
+#include "common.h"
 #include "freertos/idf_additions.h"
-#include "gpio_util.h"
+#include "hardware/gpio_util.h"
 
 static const char *TAG = "BUTTON_TASK";
 
@@ -54,7 +54,7 @@ void UAL_BUTTON_TASK_Start(void *pvParameters) {
 			UAL_GPIO_UTIL_EnableButtonIt();
 			uint8_t value;
 			BaseType_t status = xQueueReceive(BUTTON_IT_QUEUE, &value, pdMS_TO_TICKS(10000));
-			if (status == pdFAIL) {
+			if (status == errQUEUE_EMPTY) {
 				UAL_QueueTimeoutError_Handler();
 				vTaskDelay(pdMS_TO_TICKS(100));
 			} else if (status == pdPASS) {

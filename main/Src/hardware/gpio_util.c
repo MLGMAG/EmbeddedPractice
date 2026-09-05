@@ -1,4 +1,4 @@
-#include "gpio_util.h"
+#include "hardware/gpio_util.h"
 #include "driver/gpio.h"
 #include "esp_log.h"
 #include "freertos/idf_additions.h"
