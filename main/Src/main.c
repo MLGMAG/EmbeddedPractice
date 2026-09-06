@@ -11,6 +11,7 @@
 #include "task/sensors_data_sync_task.h"
 #include "hardware/uart_util.h"
 #include "hardware/wifi_sta_util.h"
+#include "hardware/http_server_util.h"
 
 
 TaskHandle_t BUTTON_TASK_HANDLER = NULL;
@@ -84,6 +85,7 @@ static void init(void) {
 	init_tasks();
 	
 	UAL_WIFI_STA_UTIL_Init();
+	UAL_HTTP_SERVER_UTIL_Init();
 }
 
 void app_main(void) {
