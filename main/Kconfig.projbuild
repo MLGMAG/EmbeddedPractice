@@ -67,5 +67,9 @@ menu "App Configuration"
         int "LED GPIO number"
 		range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
         default 4
+	
+	config SENSORS_DATA_SYNC_TIME_MS
+	    int "Interval for sensors data syncronization in milliseconds"
+	    default 60000
 
 endmenu
