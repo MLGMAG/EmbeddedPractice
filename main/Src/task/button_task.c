@@ -46,8 +46,6 @@ void init() {
 void UAL_BUTTON_TASK_Start(void *pvParameters) {
 	init();
 	
-	GPIO_PinState led_state = GPIO_PIN_RESET;
-	
 	while(1) {
 		UAL_BUTTON_STATE_t button_state = UAL_BUTTON_STATE_GetState();
 		if (button_state == UAL_BUTTON_STATE_IDLE) {
@@ -63,7 +61,7 @@ void UAL_BUTTON_TASK_Start(void *pvParameters) {
 			}
 		} else if (button_state == UAL_BUTTON_STATE_RELEASE) {
 			ESP_LOGI(TAG, "Button is pressed!");
-			led_state = led_state == GPIO_PIN_SET ? GPIO_PIN_RESET : GPIO_PIN_SET;
+			GPIO_PinState led_state = UAL_GPIO_UTIL_GetLed() == GPIO_PIN_SET ? GPIO_PIN_RESET : GPIO_PIN_SET;
 			UAL_GPIO_UTIL_SetLed(led_state);
 			UAL_BUTTON_STATE_UpdateState(GPIO_PIN_RESET);
 		} else {

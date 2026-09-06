@@ -9,6 +9,8 @@ extern QueueHandle_t BUTTON_IT_QUEUE;
 
 static const char *TAG = "GPIO_UTILS";
 
+static GPIO_PinState led_state = GPIO_PIN_RESET;
+
 static void IRAM_ATTR button_isr(void *arg) {
 	uint8_t value = 1;
 	BaseType_t higher_priority_task_woken = pdFALSE;
@@ -41,6 +43,11 @@ GPIO_PinState UAL_GPIO_UTIL_GetInputButtonState() {
 												  : GPIO_PIN_RESET;
 }
 
+GPIO_PinState UAL_GPIO_UTIL_GetLed() {
+	return led_state;
+}
+
 void UAL_GPIO_UTIL_SetLed(GPIO_PinState value) {
+	led_state = value;
 	gpio_set_level(CONFIG_LED_GPIO, value == GPIO_PIN_SET ? 1 : 0);
 }

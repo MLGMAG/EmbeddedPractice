@@ -6,10 +6,20 @@ menu "App Configuration"
 		config BUTTON_TASK_PRIORITY
 		    int "Button Task priority"
 			range 0 20
-		    default 1
+		    default 5
 		
 		config UART_RX_TASK_PRIORITY
 		    int "UART RX Task priority"
+			range 0 20
+		    default 5
+			
+		config UART_TX_TASK_PRIORITY
+		    int "UART TX Task priority"
+			range 0 20
+		    default 1
+
+		config COMMAND_HANDLER_TASK_PRIORITY
+		    int "Command Handler Task priority"
 			range 0 20
 		    default 1
 	endmenu
