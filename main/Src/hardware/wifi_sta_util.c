@@ -96,14 +96,14 @@ void UAL_WIFI_STA_UTIL_Init() {
 	if (bits & WIFI_CONNECTED_BIT) {
 		ESP_LOGI(
 			TAG, 
-			"connected to ap SSID: '%s' password: '%s'", 
+			"connected to SSID: '%s'", 
 			CONFIG_WIFI_SSID,
 			CONFIG_WIFI_PASSWORD
 		);
 	} else if (bits & WIFI_FAIL_BIT) {
 		ESP_LOGI(
 			TAG, 
-			"Failed to connect to SSID: '%s', password: '%s'",
+			"failed to connect to SSID: '%s'",
 			CONFIG_WIFI_SSID, 
 			CONFIG_WIFI_PASSWORD
 		);
