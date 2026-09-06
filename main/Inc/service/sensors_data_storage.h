@@ -1,0 +1,9 @@
+#ifndef __SENSORS_DATA_STORAGE_H
+#define __SENSORS_DATA_STORAGE_H
+
+#include "common.h"
+
+void UAL_SENSORS_DATA_STORAGE_Set(const SENSORS_DATA_t *data);
+SENSORS_DATA_t UAL_SENSORS_DATA_STORAGE_Get();
+
+#endif /* __SENSORS_DATA_STORAGE_H */

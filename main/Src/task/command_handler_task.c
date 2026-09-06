@@ -4,10 +4,13 @@
 #include "freertos/idf_additions.h"
 #include <string.h>
 #include "hardware/gpio_util.h"
+#include "service/sensors_data_storage.h"
 
 #define GET_DATA_COMMAND "get data"
 #define LED_ON_COMMAND "led on"
 #define LED_OFF_COMMAND "led off"
+
+#define JSON_DATA_FORMAT "{\"timestamp\":\"%d-%02d-%02d %02d:%02d:%02d\",\"data\":{\"temperature\":%.2f,\"humidity\":%d,\"pressure\":%d}}"
 
 static const char *TAG = "COMMAND_HANDLER_TASK";
 
@@ -35,8 +38,16 @@ static void send_uart_msg(const char *msg) {
 static void handle(const char *command) {
 	if (strcmp(command, GET_DATA_COMMAND) == 0) {
 		ESP_LOGI(TAG, "GET DATA command");
+		
+		SENSORS_DATA_t sensors_data = UAL_SENSORS_DATA_STORAGE_Get();
+		sprintf((char*) message_buffer, JSON_DATA_FORMAT,
+				sensors_data.date.year, sensors_data.date.month,
+				sensors_data.date.day, sensors_data.time.hour,
+				sensors_data.time.minute, sensors_data.time.second,
+				sensors_data.weather_data.temp,
+				sensors_data.weather_data.humidity,
+				sensors_data.weather_data.pressure);
 
-		sprintf(message_buffer, "Data is unavailable");
 		send_uart_msg(message_buffer);
 	} else if (strcmp(command, LED_ON_COMMAND) == 0) {
 		ESP_LOGI(TAG, "LED ON command");
