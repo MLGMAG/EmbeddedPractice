@@ -18,10 +18,10 @@ static void IRAM_ATTR button_isr(void *arg) {
 	xQueueSendFromISR(BUTTON_IT_QUEUE, (void *)&value,
 					  &higher_priority_task_woken);
 
-	UAL_GPIO_UTIL_DisableButtonIt();
+	UAL_GPIO_UTIL_ButtonItDisable();
 }
 
-void UAL_GPIO_UTIL_DisableButtonIt() {
+void UAL_GPIO_UTIL_ButtonItDisable() {
 	esp_err_t status = gpio_isr_handler_remove(CONFIG_INPUT_GPIO);
 	if (status != ESP_OK) {
 		ESP_LOGE(TAG, "Disable button interrupt is failed, status: %d", status);
@@ -29,7 +29,7 @@ void UAL_GPIO_UTIL_DisableButtonIt() {
 	}
 }
 
-void UAL_GPIO_UTIL_EnableButtonIt() {
+void UAL_GPIO_UTIL_ButtonItEnable() {
 	esp_err_t status =
 		gpio_isr_handler_add(CONFIG_INPUT_GPIO, button_isr, NULL);
 	if (status != ESP_OK) {
@@ -38,16 +38,16 @@ void UAL_GPIO_UTIL_EnableButtonIt() {
 	}
 }
 
-GPIO_PinState UAL_GPIO_UTIL_GetInputButtonState() {
+GPIO_PinState UAL_GPIO_UTIL_InputButtonStateGet() {
 	return gpio_get_level(CONFIG_INPUT_GPIO) == 1 ? GPIO_PIN_SET
 												  : GPIO_PIN_RESET;
 }
 
-GPIO_PinState UAL_GPIO_UTIL_GetLed() {
+GPIO_PinState UAL_GPIO_UTIL_LedStateGet() {
 	return led_state;
 }
 
-void UAL_GPIO_UTIL_SetLed(GPIO_PinState value) {
+void UAL_GPIO_UTIL_LedStateSet(GPIO_PinState value) {
 	led_state = value;
 	gpio_set_level(CONFIG_LED_GPIO, value == GPIO_PIN_SET ? 1 : 0);
 }

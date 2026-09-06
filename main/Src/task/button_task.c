@@ -49,7 +49,7 @@ void UAL_BUTTON_TASK_Start(void *pvParameters) {
 	while(1) {
 		UAL_BUTTON_STATE_t button_state = UAL_BUTTON_STATE_GetState();
 		if (button_state == UAL_BUTTON_STATE_IDLE) {
-			UAL_GPIO_UTIL_EnableButtonIt();
+			UAL_GPIO_UTIL_ButtonItEnable();
 			uint8_t value;
 			BaseType_t status = xQueueReceive(BUTTON_IT_QUEUE, &value, pdMS_TO_TICKS(10000));
 			if (status == errQUEUE_EMPTY) {
@@ -61,11 +61,11 @@ void UAL_BUTTON_TASK_Start(void *pvParameters) {
 			}
 		} else if (button_state == UAL_BUTTON_STATE_RELEASE) {
 			ESP_LOGI(TAG, "Button is pressed!");
-			GPIO_PinState led_state = UAL_GPIO_UTIL_GetLed() == GPIO_PIN_SET ? GPIO_PIN_RESET : GPIO_PIN_SET;
-			UAL_GPIO_UTIL_SetLed(led_state);
+			GPIO_PinState led_state = UAL_GPIO_UTIL_LedStateGet() == GPIO_PIN_SET ? GPIO_PIN_RESET : GPIO_PIN_SET;
+			UAL_GPIO_UTIL_LedStateSet(led_state);
 			UAL_BUTTON_STATE_UpdateState(GPIO_PIN_RESET);
 		} else {
-			GPIO_PinState button_value = UAL_GPIO_UTIL_GetInputButtonState() == GPIO_PIN_RESET ? GPIO_PIN_SET : GPIO_PIN_RESET;
+			GPIO_PinState button_value = UAL_GPIO_UTIL_InputButtonStateGet() == GPIO_PIN_RESET ? GPIO_PIN_SET : GPIO_PIN_RESET;
 			UAL_BUTTON_STATE_UpdateState(button_value);
 			vTaskDelay(pdMS_TO_TICKS(5));
 		}

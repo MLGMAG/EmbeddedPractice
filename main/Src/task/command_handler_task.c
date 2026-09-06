@@ -37,8 +37,6 @@ static void send_uart_msg(const char *msg) {
 
 static void handle(const char *command) {
 	if (strcmp(command, GET_DATA_COMMAND) == 0) {
-		ESP_LOGI(TAG, "GET DATA command");
-		
 		SENSORS_DATA_t sensors_data = UAL_SENSORS_DATA_STORAGE_Get();
 		sprintf((char*) message_buffer, JSON_DATA_FORMAT,
 				sensors_data.date.year, sensors_data.date.month,
@@ -50,17 +48,11 @@ static void handle(const char *command) {
 
 		send_uart_msg(message_buffer);
 	} else if (strcmp(command, LED_ON_COMMAND) == 0) {
-		ESP_LOGI(TAG, "LED ON command");
-		
-		UAL_GPIO_UTIL_SetLed(GPIO_PIN_SET);
-		
+		UAL_GPIO_UTIL_LedStateSet(GPIO_PIN_SET);
 		sprintf(message_buffer, "Led is turned on");
 		send_uart_msg(message_buffer);
 	} else if (strcmp(command, LED_OFF_COMMAND) == 0) {
-		ESP_LOGI(TAG, "LED OFF command");
-		
-		UAL_GPIO_UTIL_SetLed(GPIO_PIN_RESET);
-		
+		UAL_GPIO_UTIL_LedStateSet(GPIO_PIN_RESET);
 		sprintf(message_buffer, "Led is turned off");
 		send_uart_msg(message_buffer);
 	} else {
