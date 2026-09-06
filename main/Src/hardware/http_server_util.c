@@ -68,4 +68,6 @@ void UAL_HTTP_SERVER_UTIL_Init() {
 		&disconnect_handler, 
 		&HTTPD_SERVER_HANDLER
 	));
+	
+	HTTPD_SERVER_HANDLER = start_webserver();
 }
