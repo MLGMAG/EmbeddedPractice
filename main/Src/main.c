@@ -10,6 +10,8 @@
 #include "task/command_handler_task.h"
 #include "task/sensors_data_sync_task.h"
 #include "hardware/uart_util.h"
+#include "hardware/wifi_sta_util.h"
+
 
 TaskHandle_t BUTTON_TASK_HANDLER = NULL;
 TaskHandle_t UART_RX_TASK_HANDLER = NULL;
@@ -80,6 +82,8 @@ static void init(void) {
 	UAL_UART_UTIL_Init();
 
 	init_tasks();
+	
+	UAL_WIFI_STA_UTIL_Init();
 }
 
 void app_main(void) {

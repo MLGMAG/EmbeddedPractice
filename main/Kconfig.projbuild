@@ -2,7 +2,7 @@ menu "App Configuration"
 
     orsource "$IDF_PATH/examples/common_components/env_caps/$IDF_TARGET/Kconfig.env_caps"
 
-	menu "TASK"
+	menu "TASK Configuration"
 		config BUTTON_TASK_PRIORITY
 		    int "Button Task priority"
 			range 0 20
@@ -29,7 +29,7 @@ menu "App Configuration"
 		    default 1
 	endmenu
 
-	menu "UART"
+	menu "UART Configuration"
 		config UART_BAUD_RATE
 			int "UART communication speed"
 			range 1200 115200
@@ -43,7 +43,7 @@ menu "App Configuration"
 		    default 37
 	
 		config UART_TX_PORT
-		    int "UART RX port"
+		    int "UART TX port"
 		    range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
 		    default 38
 		
@@ -57,7 +57,23 @@ menu "App Configuration"
 			range 256 2048
 			default 256
 	endmenu
+
+	menu "Wi-Fi Configuration"
+		config WIFI_SSID
+		    string "WiFi SSID"
+		    help
+		        SSID (network name) you want to connect to.
+
+		config WIFI_PASSWORD
+		    string "WiFi Password"
+		    help
+		        Password of the Wi-Fi network you want to connect to.
 		
+		config WIFI_CONNECTION_MAX_RETRY
+		    int "Max connection retry count"
+			default 10
+	endmenu
+
     config INPUT_GPIO
         int "Input GPIO number"
         range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
