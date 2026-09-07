@@ -98,7 +98,8 @@ void UAL_COMMAND_HANDLER_Handle(uint8_t* command) {
 		UART_TX_QUEUE_MSG_t uart_queue_msg;
 		DATE_t date;
 
-		int parsed_count = sscanf((char*) command, "set-date %d-%d-%d", &date.year, &date.month, &date.day);
+		int parsed_count = sscanf((char*) command, "set-date %d-%d-%d",
+				(int*) &date.year, (int*) &date.month, (int*) &date.day);
 
 		if (parsed_count != 3) {
 			sprintf((char*) uart_queue_msg.msg, "Could not parse date.\n");
@@ -123,7 +124,8 @@ void UAL_COMMAND_HANDLER_Handle(uint8_t* command) {
 		UART_TX_QUEUE_MSG_t uart_queue_msg;
 		TIME_t time;
 
-	    int parsed_count = sscanf((char*) command, "set-time %d:%d:%d", &time.hour, &time.minute, &time.second);
+		int parsed_count = sscanf((char*) command, "set-time %d:%d:%d",
+				(int*) &time.hour, (int*) &time.minute, (int*) &time.second);
 
 		if (parsed_count != 3) {
 			sprintf((char*) uart_queue_msg.msg, "Could not parse time.\n");

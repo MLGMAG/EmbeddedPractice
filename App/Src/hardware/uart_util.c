@@ -67,18 +67,17 @@ uint8_t* UAL_UART_UTIL_Rx_GetBuffer() {
 }
 
 void HAL_UARTEx_RxEventCallback(UART_HandleTypeDef *huart, uint16_t offset) {
-	if (offset != last_rx_offset) {
-		if (offset < last_rx_offset) {
-			last_rx_offset = 0;
-		}
+	if (offset < last_rx_offset) {
+		last_rx_offset = 0;
+	}
 
-		while (last_rx_offset < offset) {
-			UART_DMA_ProcessChar((char) uart_dma_buffer[last_rx_offset]);
-			last_rx_offset++;
-		}
+	while (last_rx_offset < offset) {
+		UART_DMA_ProcessChar((char) uart_dma_buffer[last_rx_offset]);
+		last_rx_offset++;
 	}
 }
 
 void HAL_UART_ErrorCallback(UART_HandleTypeDef *huart) {
-	UAL_Error_Handler();
+//	UAL_Error_Handler();
+	UAL_UART_UTIL_Rx_EnableDma();
 }
