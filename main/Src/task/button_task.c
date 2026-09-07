@@ -10,7 +10,7 @@ static const char *TAG = "BUTTON_TASK";
 
 QueueHandle_t BUTTON_IT_QUEUE;
 
-void init() {
+static void init() {
 	gpio_config_t config;
 	esp_err_t status;
 

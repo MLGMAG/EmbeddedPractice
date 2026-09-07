@@ -4,6 +4,8 @@
 #include "hardware/uart_util.h"
 #include <stdint.h>
 
+#define UART_PORT UART_NUM_1
+
 typedef enum {
 	COMMAND_AVAILABLE,
 	COMMAND_UNAVAILABLE,
@@ -16,6 +18,7 @@ static uint8_t data_buffer[COMMAND_LEN_MAX] = {0};
 static uint8_t data_pointer = 0;
 
 extern QueueHandle_t COMMAND_QUEUE_HANDLER;
+extern QueueHandle_t UAL_UART1_UTIL_QUEUE;
 
 static PARSE_STATUS_t parse_data(uint8_t *in_buffer, uint32_t len) {
 	PARSE_STATUS_t status = COMMAND_UNAVAILABLE;
@@ -47,6 +50,8 @@ static PARSE_STATUS_t parse_data(uint8_t *in_buffer, uint32_t len) {
 void UAL_UART_RX_TASK_Start(void *pvParameters) {
 	while (1) {
 		uint16_t data_len = UAL_UART_UTIL_Receive(
+			UART_PORT,
+			UAL_UART1_UTIL_QUEUE,
 			raw_data_buffer, 
 			COMMAND_LEN_MAX, 
 			pdMS_TO_TICKS(10000)

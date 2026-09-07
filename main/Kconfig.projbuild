@@ -37,15 +37,25 @@ menu "App Configuration"
 			help
 			    UART communication speed.
 		
-		config UART_RX_PORT
-		    int "UART RX port"
+		config UART1_RX_PORT
+		    int "UART1 RX port"
 		    range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
 		    default 37
 	
-		config UART_TX_PORT
-		    int "UART TX port"
+		config UART1_TX_PORT
+		    int "UART1 TX port"
 		    range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
 		    default 38
+
+		config UART2_RX_PORT
+		    int "UART2 RX port"
+		    range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+		    default 47
+
+		config UART2_TX_PORT
+		    int "UART2 TX port"
+		    range ENV_GPIO_RANGE_MIN ENV_GPIO_OUT_RANGE_MAX
+		    default 48
 		
 		config UART_RX_BUFFER_SIZE
 			int "UART RX buffer size"
@@ -86,6 +96,6 @@ menu "App Configuration"
 	
 	config SENSORS_DATA_SYNC_TIME_MS
 	    int "Interval for sensors data syncronization in milliseconds"
-	    default 60000
+		default 60000
 
 endmenu

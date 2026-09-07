@@ -37,7 +37,7 @@ static void send_uart_msg(const char *msg) {
 static void handle(const char *command) {
 	if (strcmp(command, GET_DATA_COMMAND) == 0) {
 		SENSORS_DATA_t sensors_data = UAL_SENSORS_DATA_STORAGE_Get();
-		UAL_JSON_UTIL_SensorsDataCovertToJson(message_buffer, &sensors_data);
+		UAL_JSON_UTIL_ConvertSensorsDataToJson(message_buffer, &sensors_data);
 		send_uart_msg(message_buffer);
 	} else if (strcmp(command, LED_ON_COMMAND) == 0) {
 		UAL_GPIO_UTIL_LedStateSet(GPIO_PIN_SET);
